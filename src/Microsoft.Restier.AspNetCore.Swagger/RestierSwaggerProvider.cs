@@ -10,6 +10,8 @@ using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.OData;
 using Swashbuckle.AspNetCore.Swagger;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Microsoft.Restier.AspNetCore.Swagger
 {
@@ -56,11 +58,17 @@ namespace Microsoft.Restier.AspNetCore.Swagger
             openApiSettings?.Invoke(settings);
 
             // @robertmclaws: The host defaults internally to localhost; isn't set automatically.
-            var requestHost = httpContextAccessor.HttpContext.Request.Host.Value;
-            if (!settings.ServiceRoot.ToString().StartsWith(requestHost))
-            {
-                settings.ServiceRoot = new Uri($"{httpContextAccessor.HttpContext.Request.Scheme}://{requestHost}");
-            }
+            var request = httpContextAccessor.HttpContext?.Request ?? 
+                throw new InvalidOperationException("The HttpContext is not available");
+
+                List<string> pathParts = [
+                    // @robertmclaws: You're going to think the next line is an error and want to put the second slash in.
+                    //                Don't. The second slash will be added with the string.Join(). ;)
+                    $"{request.Scheme}:/",
+                    request.Host.Value,
+                    perRouteContainer.GetRoutePrefix(documentName)
+                ];
+            settings.ServiceRoot = new Uri(string.Join("/", pathParts.Where(c => !string.IsNullOrWhiteSpace(c))));
 
             return model.ConvertToOpenApi(settings);
         }
